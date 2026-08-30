@@ -1,0 +1,2146 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Tōkyō Rail Trial — Physarum Simulation</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css">
+  <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
+  <style>
+    :root {
+      --bg: #0a0d08;
+      --dish: #0e120c;
+      --panel: #12160f;
+      --panel-border: #282c1d;
+      --ink: #eae4d3;
+      --ink-dim: #8d8a76;
+      --ink-faint: #5b5947;
+      --amber: #f2b705;
+      --amber-soft: #f7d374;
+      --teal: #6fae9b;
+      --teal-dim: #3c5c53;
+      --water: #0c1f26;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      /*background:
+        radial-gradient(circle at 1px 1px, #1a1f13 1px, transparent 1px) 0 0/22px 22px,
+        var(--bg);*/
+      background-color: #000000;
+      color: var(--ink);
+      font-family: 'IBM Plex Sans', sans-serif;
+      min-height: 100vh;
+      padding: 28px 24px 40px;
+    }
+
+    .wrap {
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 22px;
+      border-bottom: 1px solid var(--panel-border);
+      padding-bottom: 16px;
+    }
+
+    .eyebrow {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--teal);
+      margin-bottom: 8px;
+    }
+
+    h1 {
+      font-family: 'Fraunces', serif;
+      font-weight: 600;
+      font-size: clamp(28px, 4vw, 42px);
+      margin: 0 0 6px;
+      letter-spacing: -0.01em;
+      color: var(--ink);
+    }
+
+    h1 em {
+      color: var(--amber-soft);
+      font-style: italic;
+    }
+
+    .subtitle {
+      font-family: 'Fraunces', serif;
+      font-style: italic;
+      font-weight: 500;
+      color: var(--ink-dim);
+      font-size: 15px;
+      max-width: 640px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 20px;
+      align-items: start;
+    }
+
+    @media (max-width:880px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .dish-frame {
+      background: var(--dish);
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      padding: 14px;
+      position: relative;
+    }
+
+    .dish-frame .tag {
+      position: absolute;
+      top: 14px;
+      left: 24px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      z-index: 3;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, .8);
+    }
+
+    .dish-stage {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 900/600;
+      border-radius: 3px;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    #map {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      z-index: 0;
+    }
+
+    canvas {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+    }
+
+    .dish-caption {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      color: var(--ink-faint);
+      padding: 10px 4px 0;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      padding: 18px;
+    }
+
+    .readout {
+      font-family: 'IBM Plex Mono', monospace;
+      background: #080a06;
+      border: 1px solid var(--panel-border);
+      border-radius: 4px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+    }
+
+    .readout .row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--ink-dim);
+      padding: 3px 0;
+    }
+
+    .readout .row b {
+      color: var(--amber-soft);
+      font-weight: 600;
+    }
+
+    .phase-bar {
+      height: 3px;
+      background: #1c2013;
+      border-radius: 2px;
+      overflow: hidden;
+      margin: 6px 0 2px;
+    }
+
+    .phase-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--teal), var(--amber));
+      transition: width .25s linear;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    button {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      background: transparent;
+      border: 1px solid var(--panel-border);
+      color: var(--ink);
+      padding: 9px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      flex: 1;
+      transition: border-color .15s, color .15s;
+    }
+
+    button:hover {
+      border-color: var(--amber);
+      color: var(--amber-soft);
+    }
+
+    button.primary {
+      background: var(--amber);
+      color: #161403;
+      border-color: var(--amber);
+      font-weight: 600;
+    }
+
+    button.primary:hover {
+      background: var(--amber-soft);
+      color: #161403;
+    }
+
+    button#resetBtn:hover {
+      border-color: var(--teal);
+      color: var(--teal);
+    }
+
+    fieldset {
+      border: none;
+      padding: 0;
+      margin: 0 0 16px;
+    }
+
+    legend {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--teal);
+      margin-bottom: 10px;
+      padding: 0;
+    }
+
+    .field {
+      margin-bottom: 11px;
+    }
+
+    .field label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--ink-dim);
+      margin-bottom: 4px;
+    }
+
+    .field label span.val {
+      font-family: 'IBM Plex Mono', monospace;
+      color: var(--ink);
+    }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 3px;
+      background: var(--panel-border);
+      border-radius: 2px;
+      outline: none;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--amber);
+      cursor: pointer;
+      border: 2px solid #0a0d08;
+      box-shadow: 0 0 0 1px var(--amber);
+    }
+
+    input[type=range]::-moz-range-thumb {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--amber);
+      cursor: pointer;
+      border: none;
+    }
+
+    .legend-box {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      color: var(--ink-dim);
+      line-height: 1.9;
+      border-top: 1px solid var(--panel-border);
+      padding-top: 14px;
+    }
+
+    .legend-box .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    .note {
+      margin-top: 20px;
+      font-size: 13px;
+      line-height: 1.65;
+      color: var(--ink-dim);
+      max-width: 760px;
+    }
+
+    .note b {
+      color: var(--ink);
+    }
+
+    .note a {
+      color: var(--teal);
+      text-decoration: none;
+      border-bottom: 1px dotted var(--teal-dim);
+    }
+
+    #sensingPanel,
+    #behaviorPanel,
+    #trailPanel {
+      display: none !important;
+    }
+    /* ---------- top navigation tabs ---------- */
+    .top-tabs {
+      position: sticky;
+      top: 0;
+      z-index: 10000;
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 12px;
+      margin: -28px -24px 28px;
+      background: rgba(10,13,8,.96);
+      border-bottom: 1px solid var(--panel-border);
+      backdrop-filter: blur(10px);
+    }
+    .top-tabs button {
+      flex: 0 0 auto;
+      min-width: 130px;
+      padding: 10px 18px;
+      color: var(--ink-dim);
+      border-color: transparent;
+      text-transform: none;
+      letter-spacing: .02em;
+      font-size: 12px;
+    }
+    .top-tabs button.active {
+      color: #161403;
+      background: var(--amber);
+      border-color: var(--amber);
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .tab-page {
+      min-height: calc(100vh - 80px);
+      padding: 36px 10px 60px;
+    }
+    .tab-page-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .tab-page h2 {
+      font-family: 'Fraunces', serif;
+      font-size: 34px;
+      color: var(--amber-soft);
+      margin: 0 0 10px;
+    }
+    .tab-page p { color: var(--ink-dim); line-height: 1.7; }
+    .ppt-container {
+      width: 100%;
+      margin: 25px auto 0;
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #0b0c10;
+    }
+    .ppt-container iframe {
+      width: 100%;
+      height: 78vh;
+      min-height: 600px;
+      border: none;
+      display: block;
+    }
+    .sources-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap: 16px;
+      margin-top: 28px;
+    }
+    .source-card {
+      display: block;
+      padding: 20px;
+      min-height: 110px;
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--ink);
+      text-decoration: none;
+      transition: .2s ease;
+    }
+    .source-card:hover {
+      border-color: var(--amber);
+      transform: translateY(-2px);
+    }
+    .source-number {
+      font-family: 'IBM Plex Mono', monospace;
+      color: var(--amber);
+      font-size: 11px;
+      letter-spacing: .08em;
+    }
+    .source-title { display: block; margin-top: 8px; font-weight: 600; }
+    .source-url {
+      display: block;
+      margin-top: 7px;
+      color: var(--teal);
+      font-size: 11px;
+      word-break: break-all;
+    }
+    @media (max-width: 650px) {
+      .top-tabs { gap: 3px; }
+      .top-tabs button { min-width: 0; padding: 9px 8px; font-size: 10px; }
+      .sources-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Real basemap: no API key required */
+    #map { background: #0c1f26; overflow: hidden; }
+    .maplibregl-ctrl-attrib { background: rgba(8,10,6,.78) !important; color: var(--ink-faint) !important; font-family: 'IBM Plex Mono', monospace !important; font-size: 9px !important; }
+    .maplibregl-ctrl-attrib a { color: var(--teal) !important; }
+  </style>
+</head>
+
+<body>
+  <nav class="top-tabs" aria-label="Main navigation">
+    <button class="active" onclick="showTab('simulationTab', this)">Simulation</button>
+    <button onclick="showTab('presentationTab', this)">Presentation</button>
+    <button onclick="showTab('sourcesTab', this)">Sources</button>
+    <button onclick="showTab('teamTab', this)">Meet Our Team</button>
+  </nav>
+
+  <div id="simulationTab" class="tab-content active">
+  <div class="wrap">
+
+    <header>
+      <h1 style="color: #f2b705 !important;">Slime Mould: Tokyo Subway Optimization</h1>
+      <div class="subtitle">An interactive simulation demonstrating how Physarum-inspired behaviour can explore and form
+        efficient transportation networks.<!------<div><a style="color: #f2b705 !important;"
+            href="https://aarshias.github.io/Physarum-Tokyo-Subway-Optimization/slime%20mould%20optimization%20algorithm.pdf"
+            target="_blank">
+            View Presentation
+          </a>---->
+        </div>
+      </div>
+    </header>
+
+    <div class="layout">
+      <div class="dish-frame">
+        <div class="tag">Dish 01 · Kantō plain, live map</div>
+        <div class="dish-stage">
+          <div id="map" aria-label="Interactive Kanto region map"></div>
+          <canvas id="dish" width="900" height="600"></canvas>
+        </div>
+        <div class="dish-caption">
+          <span id="caption">Click the dish to add a stop, or drag a station to move it</span>
+          <span id="fps">— fps</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="readout">
+          <div class="row"><span>Tick</span><b id="rTick">0</b></div>
+          <div class="row"><span>Agents</span><b id="rAgents">0</b></div>
+          <div class="row"><span>Mode</span><b id="rMode">explore</b></div>
+          <div class="row" id="linkedRow"><span>Stations linked</span><b id="rLinked">0 / 32</b></div>
+          <div class="row" id="routeRow" style="display:none;"><span>Route</span><b id="rRoute">— → —</b></div>
+          <div class="row" id="routeStatusRow" style="display:none;"><span>Path</span><b id="rRouteStatus">—</b></div>
+          <div class="row"><span>State</span><b id="rState">paused</b></div>
+          <div class="row"><span>Phase</span><b id="rPhase">exploring</b></div>
+          <div class="phase-bar">
+            <div class="phase-bar-fill" id="phaseFill"></div>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="primary" id="playBtn">Start</button>
+          <button id="resetBtn">Reset</button>
+        </div>
+        <div class="btn-row">
+          <button id="skipStageBtn" type="button">Skip stage ⏭</button>
+          <button id="snapshotBtn" type="button">Save PNG ⤓</button>
+        </div>
+
+        <fieldset>
+          <legend>Population</legend>
+          <div class="field">
+            <label>Agents <span class="val" id="vAgents">3000</span></label>
+            <input type="range" id="agents" min="500" max="7000" step="100" value="5200">
+          </div>
+          <div class="field">
+            <label>Simulation speed <span class="val" id="vSpeed">2</span></label>
+            <input type="range" id="speed" min="1" max="4" step="1" value="2">
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Route planner</legend>
+          <div class="btn-row" style="margin-bottom:10px;">
+            <button class="primary" id="exploreModeBtn" type="button">Explore</button>
+            <button id="routeModeBtn" type="button">Plan route</button>
+          </div>
+          <div class="field">
+            <label>Start → End <span class="val" id="rRouteMini">— → —</span></label>
+          </div>
+          <div class="btn-row">
+
+            <button id="clearRouteBtn" type="button">Clear</button>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Terrain</legend>
+          <div class="btn-row">
+            <button id="obstacleToolBtn" type="button">🖌 Paint barrier</button>
+            <button id="clearObstaclesBtn" type="button">Clear</button>
+          </div>
+        </fieldset>
+
+        <fieldset id="sensingPanel">
+          <legend>Sensing</legend>
+          <div class="field">
+            <label>Sensor angle <span class="val" id="vSA">35°</span></label>
+            <input type="range" id="sensorAngle" min="10" max="80" step="1" value="35">
+          </div>
+          <div class="field">
+            <label>Sensor distance <span class="val" id="vSD">9</span></label>
+            <input type="range" id="sensorDist" min="3" max="20" step="1" value="9">
+          </div>
+          <div class="field">
+            <label>Food attraction <span class="val" id="vFW">1.0</span></label>
+            <input type="range" id="foodWeight" min="0" max="3" step="0.1" value="1.0">
+          </div>
+        </fieldset>
+
+        <fieldset id="behaviorPanel">
+          <legend>Behavior</legend>
+          <div class="field">
+            <label>Turn speed <span class="val" id="vTS">0.30</span></label>
+            <input type="range" id="turnSpeed" min="0.05" max="0.8" step="0.01" value="0.30">
+          </div>
+          <div class="field">
+            <label>Wander / jitter <span class="val" id="vJ">0.15</span></label>
+            <input type="range" id="jitter" min="0" max="0.6" step="0.01" value="0.15">
+          </div>
+        </fieldset>
+
+        <fieldset id="trailPanel">
+          <legend>Trail (mucus)</legend>
+          <div class="field">
+            <label>Decay <span class="val" id="vDecay">0.970</span></label>
+            <input type="range" id="decay" min="0.975" max="0.998" step="0.001" value="0.993">
+          </div>
+          <div class="field">
+            <label>Deposit <span class="val" id="vDep">3.0</span></label>
+            <input type="range" id="deposit" min="0.5" max="8" step="0.1" value="4.0">
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Growth cycle</legend>
+          <div class="field">
+            <label>Explore (flood) <span class="val" id="vExploreT">1800</span></label>
+            <input type="range" id="exploreTicks" min="200" max="4000" step="100" value="1800">
+          </div>
+          <div class="field">
+            <label>Form routes over <span class="val" id="vTransT">900</span></label>
+            <input type="range" id="transitionTicks" min="100" max="3000" step="100" value="900">
+          </div>
+          <div class="field">
+            <label>Hold steady <span class="val" id="vHoldT">6000</span></label>
+            <input type="range" id="holdTicks" min="500" max="20000" step="500" value="6000">
+          </div>
+          <div class="field">
+            <label>Retract over <span class="val" id="vRetractT">1500</span></label>
+            <input type="range" id="retractTicks" min="500" max="6000" step="100" value="3000">
+          </div>
+        </fieldset>
+
+        <div class="legend-box">
+          <div><span class="dot" style="background:var(--amber)"></span>mucus trail — reinforced route</div>
+          <div><span class="dot" style="background:var(--amber-soft); box-shadow:0 0 6px var(--amber)"></span>city
+            reached by the network</div>
+          <div><span class="dot" style="background:transparent;border:1px solid var(--teal)"></span>city not yet linked
+          </div>
+          <div><span class="dot" style="background:transparent;border:1px dashed var(--ink-faint)"></span>Tōkyō Bay
+            (real water) — impassable</div>
+          <div><span class="dot" style="background:#3a2418;border:1px solid #6b4530"></span>painted barrier — impassable
+          </div>
+        </div>        
+      </div>
+      
+    </div>
+
+    <!-- -- <div class="note">
+    <b>What's happening:</b> each of the thousands of particles above is a simplified Physarum agent, moving over an actual map of the Kantō plain. It senses trail concentration and food scent along three points ahead of it, turns toward the strongest signal, moves, and deposits its own trail — the same local rule the real organism follows via cytoplasmic streaming. The colony now runs a full four‑stage life cycle on repeat: it <b>explores</b>, sending tendrils out toward every city at once rather than pooling near Tōkyō; it <b>forms routes</b>, sharpening its pull toward real stations so the busiest corridors thicken into a subway‑like map; it <b>holds steady</b> so you can study or screenshot the result; then it <b>retracts</b>, dissolving back toward nothing before the cycle begins again — watch the stage name and progress bar next to "Phase," or tune each stage's length under <b>Growth cycle</b>, or use <b>Skip stage</b> to jump ahead without waiting. Beyond adding stops and planning routes, you can now <b>drag any station</b> to a new spot and watch the network reroute live, <b>click a custom stop again to remove it</b>, <b>paint barriers</b> under <b>Terrain</b> to force the colony around obstacles the way the real experiment used light to block off mountains and coastline, hover a station for its live signal strength, and hit <b>Save PNG</b> to keep a snapshot. Keyboard shortcuts: space to play/pause, R to reset, O to toggle the barrier tool. Switch to <b>Plan route</b> and click two stations to see the closer‑to‑life case: with only one destination scenting the dish, the organism commits to a single dominant tube between your two stations, the same way a real rider takes one line from A to B — the white line traces that tube's strongest path. Station coordinates are real; the Tōkyō Bay obstacle is a hand‑placed approximation of the coastline, not a survey. Map tiles © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors. For the real 2010 experiment — oat flakes standing in for thirty‑six Kantō cities, and a slime mould that converged on a network strikingly close to the actual JR rail map — search for <a href="https://www.google.com/search?q=Tero+Takagaki+Nakagaki+2010+rules+for+biologically+inspired+adaptive+network+design" target="_blank" rel="noopener">Tero et al., "Rules for Biologically Inspired Adaptive Network Design," Science 2010</a>.
+  </div> ---->
+
+
+  </div>
+  </div>
+
+  <!-- ===================================================== -->
+  <!-- PRESENTATION -->
+  <!-- ===================================================== -->
+  <section id="presentationTab" class="tab-content tab-page">
+    <div class="tab-page-inner">
+      <h2>Presentation</h2>
+      <p>View the project presentation below.</p>
+      <div class="ppt-container">
+        <iframe src="EOB/SLIME MOULD INSPIRED OPTIMIZATION ​ ALGORITHMS ​.pptx" title="Slime Mould Optimization Algorithm Presentation"></iframe>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================== -->
+  <!-- SOURCES -->
+  <!-- ===================================================== -->
+  <section id="sourcesTab" class="tab-content tab-page">
+    <div class="tab-page-inner">
+      <h2>Sources</h2>
+      <p>References used for this project.</p>
+      <div class="sources-grid">
+        <a class="source-card" href="https://blogs.ubc.ca/communicatingscience2017w211/2018/01/29/brainless-slime-mold-grows-in-pattern-like-tokyos-subway-system/" target="_blank" rel="noopener">
+          <span class="source-number">SOURCE 01</span>
+          <span class="source-title">Brainless slime mold grows in pattern like Tokyo's subway system</span>
+          <span class="source-url">blogs.ubc.ca — Communicating Science 2017 Section 211</span>
+        </a>
+        <a class="source-card" href="https://science.nasa.gov/missions/hubble/slime-mold-simulations-used-to-map-dark-matter-holding-universe-together/" target="_blank" rel="noopener">
+          <span class="source-number">SOURCE 02</span>
+          <span class="source-title">Slime Mold Simulations Used to Map Dark Matter Holding Universe Together</span>
+          <span class="source-url">science.nasa.gov</span>
+        </a>
+        <a class="source-card" href="https://direct.mit.edu/leon/article/55/5/462/112362/Slime-Mold-and-Network-Imaginaries-An-Experimental" target="_blank" rel="noopener">
+          <span class="source-number">SOURCE 03</span>
+          <span class="source-title">Slime Mold and Network Imaginaries: An Experimental Approach to Communication</span>
+          <span class="source-url">direct.mit.edu — Leonardo, MIT Press</span>
+        </a>
+        <a class="source-card" href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9838547/" target="_blank" rel="noopener">
+          <span class="source-number">SOURCE 04</span>
+          <span class="source-title">Slime Mould Algorithm: A Comprehensive Survey of Its Variants and Applications</span>
+          <span class="source-url">pmc.ncbi.nlm.nih.gov</span>
+        </a>
+        <a class="source-card" href="https://www.nature.com/articles/s41598-026-59759-2_reference.pdf" target="_blank" rel="noopener">
+          <span class="source-number">SOURCE 05</span>
+          <span class="source-title">Nature Scientific Reports — reference PDF</span>
+          <span class="source-url">nature.com</span>
+        </a>
+        <a class="source-card" href="https://www.mdpi.com/2313-7673/9/1/31" target="_blank" rel="noopener">
+          <span class="source-number">SOURCE 06</span>
+          <span class="source-title">MDPI Biomimetics 9(1), 31</span>
+          <span class="source-url">mdpi.com</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+<script>
+    function showTab(tabName, button) {
+      document.querySelectorAll('.tab-content').forEach(function(tab) {
+        tab.classList.remove('active');
+      });
+      document.querySelectorAll('.top-tabs button').forEach(function(btn) {
+        btn.classList.remove('active');
+      });
+      var selected = document.getElementById(tabName);
+      if (selected) selected.classList.add('active');
+      if (button) button.classList.add('active');
+      if (tabName === 'simulationTab') {
+        setTimeout(function() { window.dispatchEvent(new Event('resize')); }, 50);
+      }
+    }
+
+    (function () {
+      "use strict";
+
+      // ---------- canvas setup ----------
+      const canvas = document.getElementById('dish');
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;      // display resolution
+      const SCALE = 2;
+      const SW = W / SCALE, SH = H / SCALE;            // sim grid resolution
+
+      const off = document.createElement('canvas');
+      off.width = SW; off.height = SH;
+      const offCtx = off.getContext('2d');
+      const imgData = offCtx.createImageData(SW, SH);
+
+      // ---------- geography ----------
+      // Fixed lat/lng box the sim grid is linearly projected onto (Plate Carrée —
+      // close enough to Web Mercator at this latitude/extent that the MapLibre
+      // basemap beneath lines up with agent positions without per-frame syncing).
+      const BOUNDS = { south: 34.85, north: 36.65, west: 138.1, east: 141.3 };
+
+      function project(lat, lng) {
+        const x = (lng - BOUNDS.west) / (BOUNDS.east - BOUNDS.west) * SW;
+        const y = (BOUNDS.north - lat) / (BOUNDS.north - BOUNDS.south) * SH;
+        return [x, y];
+      }
+
+      // ---------- stations (real lat/lng, Kantō region) ----------
+      const BASE_STATIONS = [
+        ["Tōkyō", 35.6812, 139.7671], ["Yokohama", 35.4437, 139.6380], ["Kawasaki", 35.5308, 139.7029],
+        ["Chiba", 35.6073, 140.1065], ["Funabashi", 35.6926, 139.9825], ["Narita", 35.7763, 140.3183],
+        ["Chōshi", 35.7346, 140.8272], ["Saitama", 35.9067, 139.6238], ["Kawagoe", 35.9251, 139.4855],
+        ["Kumagaya", 36.1470, 139.3888], ["Chichibu", 35.9926, 139.0831], ["Ōme", 35.7875, 139.2764],
+        ["Hachiōji", 35.6553, 139.3389], ["Machida", 35.5461, 139.4380], ["Fujisawa", 35.3390, 139.4914],
+        ["Odawara", 35.2564, 139.1522], ["Atami", 35.0955, 139.0733], ["Numazu", 35.0987, 138.8636],
+        ["Kōfu", 35.6642, 138.5683], ["Ōtsuki", 35.6058, 138.9436], ["Mito", 36.3659, 140.4715],
+        ["Tsukuba", 36.0839, 140.0765], ["Tsuchiura", 36.0839, 140.1966], ["Utsunomiya", 36.5658, 139.8836],
+        ["Maebashi", 36.3911, 139.0608], ["Takasaki", 36.3229, 139.0031], ["Ryūgasaki", 35.9058, 140.1836],
+        ["Sakura", 35.7167, 140.2236], ["Kashima", 35.9639, 140.6297], ["Tateyama", 34.9833, 139.8703],
+        ["Kamogawa", 35.1122, 140.0994], ["Katsuura", 35.1497, 140.3122], ["Kujūkuri", 35.5167, 140.4000]
+      ];
+      function makeStation(name, lat, lng, custom) {
+        const [x, y] = project(lat, lng);
+        return { name, lat, lng, x, y, custom: !!custom };
+      }
+      const SEED = project(35.6812, 139.7671); // Tokyo
+
+      // Tokyo Bay obstacle (ellipse, sim-grid coords) — hand-fit to sit in open
+      // water between the real shore cities in the station list above.
+      const BAY = { cx: 246, cy: 195, rx: 20, ry: 22 };
+      function inBay(x, y) {
+        const dx = (x - BAY.cx) / BAY.rx, dy = (y - BAY.cy) / BAY.ry;
+        return dx * dx + dy * dy < 1;
+      }
+
+      // ---------- basemap ----------
+      // OpenFreeMap + OpenMapTiles/OpenStreetMap data.
+      // This English, Latin-only style is free and requires NO API key or account.
+      // The public OpenFreeMap instance explicitly states that there are no API keys
+      // or registration requirements.
+      const ENGLISH_MAP_STYLE = 'https://raw.githubusercontent.com/kalwinskidawid/openfreemap-translations/main/styles/liberty_nonlatin_en.json';
+
+      let mapLibreMap = null;
+      function fitMap() {
+        if (!mapLibreMap) return;
+        mapLibreMap.resize();
+        mapLibreMap.fitBounds([[BOUNDS.west, BOUNDS.south], [BOUNDS.east, BOUNDS.north]], {
+          padding: 0,
+          duration: 0
+        });
+      }
+
+      if (typeof maplibregl !== 'undefined') {
+        try {
+          mapLibreMap = new maplibregl.Map({
+            container: 'map',
+            style: ENGLISH_MAP_STYLE,
+            interactive: false,
+            attributionControl: false,
+            fadeDuration: 0
+          });
+
+          mapLibreMap.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+          mapLibreMap.on('load', fitMap);
+          setTimeout(fitMap, 500);
+
+          let resizeT = null;
+          window.addEventListener('resize', () => {
+            clearTimeout(resizeT);
+            resizeT = setTimeout(fitMap, 150);
+          });
+        } catch (err) {
+          console.warn('Basemap failed to load, continuing without it:', err);
+        }
+      } else {
+        console.warn('MapLibre did not load — simulation will run without the basemap.');
+      }
+
+      // ---------- state ----------
+      let stations = BASE_STATIONS.map(s => makeStation(s[0], s[1], s[2], false));
+      let food = new Float32Array(SW * SH);
+      let trailA = new Float32Array(SW * SH);
+      let trailB = new Float32Array(SW * SH);
+      let ax, ay, aang, aspeed, atarget; // agent arrays
+      let tick = 0;
+      let running = false;
+      let rafId = null;
+
+      // route-planning mode
+      let routeMode = false;
+      let startIdx = null, endIdx = null;
+      let routePath = [];
+      let candidateRoutes = [];
+      let routeRevealStart = 0;
+      let lastRouteCalc = -9999;
+      let networkEdges = [];
+      let trainCars = [];
+      let planTrainCars = [];
+      let planTrainRunning = false;
+      let planTrainRAF = null;
+      let simulationFinished = false;
+      let postRouteStart = 0;
+
+      // pointer interactions: dragging stations, painting obstacles, hover tooltip
+      let obstacleToolActive = false;
+      let paintDown = false;
+      let dragStationIdx = -1;
+      let dragMoved = false;
+      let hoveredIdx = -1;
+      let downSim = [0, 0];
+
+      function idx(x, y) { return y * SW + x; }
+
+      // user-paintable terrain barriers, layered on top of the fixed bay
+      const obstacles = new Uint8Array(SW * SH);
+      function isPaintedObstacle(x, y) {
+        const ix = x | 0, iy = y | 0;
+        if (ix < 0 || ix >= SW || iy < 0 || iy >= SH) return true;
+        return obstacles[iy * SW + ix] === 1;
+      }
+      function blocked(x, y) { return inBay(x, y) || isPaintedObstacle(x, y); }
+      function paintObstacleAt(mx, my, r) {
+        const x0 = Math.max(0, Math.floor(mx - r)), x1 = Math.min(SW - 1, Math.ceil(mx + r));
+        const y0 = Math.max(0, Math.floor(my - r)), y1 = Math.min(SH - 1, Math.ceil(my + r));
+        for (let y = y0; y <= y1; y++) {
+          for (let x = x0; x <= x1; x++) {
+            const dx = x - mx, dy = y - my;
+            if (dx * dx + dy * dy <= r * r) obstacles[y * SW + x] = 1;
+          }
+        }
+      }
+      function clearObstacles() { obstacles.fill(0); }
+
+      function stampFood(sx, sy, amp, sigma) {
+        const r = Math.ceil(sigma * 3);
+        const x0 = Math.max(0, Math.floor(sx - r)), x1 = Math.min(SW - 1, Math.ceil(sx + r));
+        const y0 = Math.max(0, Math.floor(sy - r)), y1 = Math.min(SH - 1, Math.ceil(sy + r));
+        for (let y = y0; y <= y1; y++) {
+          for (let x = x0; x <= x1; x++) {
+            const dx = x - sx, dy = y - sy;
+            const d2 = dx * dx + dy * dy;
+            const v = amp * Math.exp(-d2 / (2 * sigma * sigma));
+            food[idx(x, y)] += v;
+          }
+        }
+      }
+
+      function rebuildFoodForMode() {
+        food.fill(0);
+        if (routeMode) {
+          // Real-life mode: only the chosen destination(s) scent the dish, so the
+          // organism commits to a single dominant tube instead of a branching network.
+          if (startIdx != null) stampFood(stations[startIdx].x, stations[startIdx].y, 10, 4.2);
+          if (endIdx != null) stampFood(stations[endIdx].x, stations[endIdx].y, 34, 4.5);
+        } else {
+          for (const s of stations) stampFood(s.x, s.y, 28, 16);
+        }
+      }
+
+      function updateRouteLabel() {
+        const startName = startIdx != null ? stations[startIdx].name : '—';
+        const endName = endIdx != null ? stations[endIdx].name : '—';
+        const label = startName + ' → ' + endName;
+        document.getElementById('rRoute').textContent = label;
+        document.getElementById('rRouteMini').textContent = label;
+      }
+
+      function initAgents() {
+        // Match the attached Physarum experiment's exploration setup: a swarm
+        // starts from the station/food sites, with random headings and different
+        // movement speeds. This is deliberately NOT a pre-built route network.
+        const n = routeMode ? parseInt(document.getElementById('agents').value, 10) : 9000;
+        ax = new Float32Array(n); ay = new Float32Array(n); aang = new Float32Array(n);
+        aspeed = new Float32Array(n);
+        atarget = new Int32Array(n);
+
+        if (routeMode && startIdx != null) {
+          const seed = [stations[startIdx].x, stations[startIdx].y];
+          for (let i = 0; i < n; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const r = Math.random() * 10;
+            ax[i] = seed[0] + Math.cos(a) * r;
+            ay[i] = seed[1] + Math.sin(a) * r;
+            aang[i] = Math.random() * Math.PI * 2;
+            aspeed[i] = 2 + Math.random() * 1.5;
+            atarget[i] = endIdx != null ? endIdx : Math.floor(Math.random() * stations.length);
+          }
+          return;
+        }
+
+        // Exploration: randomly choose a station for every agent, rather than
+        // assigning agents in neat blocks. The random starting directions make
+        // the colony fan outward in all directions like the attached HTML.
+        for (let i = 0; i < n; i++) {
+          const parent = stations[Math.floor(Math.random() * stations.length)];
+          const spread = 35 + Math.random() * 45;
+          const a0 = Math.random() * Math.PI * 2;
+          ax[i] = parent.x + Math.cos(a0) * spread;
+          ay[i] = parent.y + Math.sin(a0) * spread;
+          aang[i] = Math.random() * Math.PI * 2;
+          aspeed[i] = 1.5 + Math.random() * 1.5;
+          let target = Math.floor(Math.random() * stations.length);
+          // Prefer a different station so formation creates many station-to-station searches.
+          if (stations.length > 1 && stations[target] === parent) {
+            target = (target + 1 + Math.floor(Math.random() * (stations.length - 1))) % stations.length;
+          }
+          atarget[i] = target;
+        }
+      }
+
+      function resetAll() {
+        routeMode = false;
+        stations = BASE_STATIONS.map(s => makeStation(s[0], s[1], s[2], false));
+        startIdx = null; endIdx = null; routePath = []; candidateRoutes = []; routeRevealStart = 0; lastRouteCalc = -9999;
+        clearObstacles();
+        updateRouteLabel();
+        rebuildFoodForMode();
+        trailA.fill(0); trailB.fill(0);
+        initAgents();
+        tick = 0;
+        simulationFinished = false;
+        trainCars = [];
+        planTrainCars = [];
+        planTrainRunning = false;
+        if (planTrainRAF) cancelAnimationFrame(planTrainRAF);
+        planTrainRAF = null;
+        running = false;
+        document.getElementById('playBtn').textContent = 'Start';
+        document.getElementById('rState').textContent = 'paused';
+        document.getElementById('rTick').textContent = '0';
+        render();
+      }
+
+      // ---------- whole-system reference network ----------
+      function rebuildNetworkEdges() {
+        const seen = new Set(), edges = [], k = 3;
+        for (let i = 0; i < stations.length; i++) {
+          const near = [];
+          for (let j = 0; j < stations.length; j++) {
+            if (i === j) continue;
+            near.push({ j, d: Math.hypot(stations[j].x - stations[i].x, stations[j].y - stations[i].y) });
+          }
+          near.sort((a, b) => a.d - b.d);
+          for (let n = 0; n < Math.min(k, near.length); n++) {
+            const j = near[n].j, a = Math.min(i, j), b = Math.max(i, j), key = a + '-' + b;
+            if (!seen.has(key)) { seen.add(key); edges.push({ a, b, d: near[n].d }); }
+          }
+        }
+        networkEdges = edges;
+      }
+
+      function buildCandidateRoutes() {
+        candidateRoutes = [];
+        if (!(routeMode && startIdx != null && endIdx != null && startIdx !== endIdx)) return;
+        rebuildNetworkEdges();
+        const adj = stations.map(() => []);
+        for (const e of networkEdges) { adj[e.a].push({ to: e.b, d: e.d }); adj[e.b].push({ to: e.a, d: e.d }); }
+        const results = [], path = [startIdx], used = new Set([startIdx]);
+        const MAX_HOPS = 9, MAX_RESULTS = 120;
+        function dfs(cur, total) {
+          if (results.length >= MAX_RESULTS) return;
+          if (cur === endIdx) { results.push({ nodes: path.slice(), cost: total }); return; }
+          if (path.length - 1 >= MAX_HOPS) return;
+          for (const e of adj[cur].slice().sort((a, b) => a.d - b.d)) {
+            if (used.has(e.to)) continue;
+            used.add(e.to); path.push(e.to); dfs(e.to, total + e.d); path.pop(); used.delete(e.to);
+            if (results.length >= MAX_RESULTS) return;
+          }
+        }
+        dfs(startIdx, 0);
+        results.sort((a, b) => a.cost - b.cost);
+        candidateRoutes = results.map((r, rank) => ({ nodes: r.nodes, cost: r.cost, rank, points: r.nodes.map(i => [stations[i].x, stations[i].y]) }));
+      }
+
+      // Draws text with a dark outline behind it so labels stay legible over
+      // the busy real-map tiles underneath, instead of just a flat fill.
+      function haloText(text, x, y, fillColor, haloColor) {
+        ctx.lineJoin = 'round';
+        ctx.miterLimit = 2;
+        ctx.strokeStyle = haloColor || 'rgba(6,8,5,0.9)';
+        ctx.lineWidth = 3;
+        ctx.strokeText(text, x, y);
+        ctx.fillStyle = fillColor;
+        ctx.fillText(text, x, y);
+      }
+
+      function drawWholeNetwork(phase, retracting) {
+        if (networkEdges.length === 0) rebuildNetworkEdges();
+        const reveal = retracting ? Math.max(0, 1 - phase) : Math.min(1, phase);
+        if (reveal <= 0) return;
+        ctx.save(); ctx.lineCap = 'round';
+        for (let ei = 0; ei < networkEdges.length; ei++) {
+          const e = networkEdges[ei], a = stations[e.a], b = stations[e.b];
+          const local = Math.max(0, Math.min(1, reveal * 1.45 - (ei % 7) * 0.035));
+          if (local <= 0) continue;
+          ctx.beginPath(); ctx.moveTo(a.x * SCALE, a.y * SCALE); ctx.lineTo(b.x * SCALE, b.y * SCALE);
+          ctx.strokeStyle = 'rgba(255,214,74,' + (0.28 + 0.55 * local) + ')';
+          ctx.lineWidth = 1.6 + 1.8 * local;
+          ctx.shadowColor = 'rgba(255,183,5,0.6)';
+          ctx.shadowBlur = 4 * local;
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+        }
+        ctx.restore();
+      }
+
+      // ---------- Dijkstra-style trace of the single strongest tube between Start and End ----------
+      function traceRoute() {
+        routePath = [];
+        candidateRoutes = [];
+        if (!(routeMode && startIdx != null && endIdx != null && startIdx !== endIdx)) return;
+        buildCandidateRoutes();
+
+        const s = stations[startIdx], e = stations[endIdx];
+        const sx = Math.round(s.x), sy = Math.round(s.y);
+        const ex = Math.round(e.x), ey = Math.round(e.y);
+        const pad = 40;
+        const x0 = Math.max(0, Math.min(sx, ex) - pad), x1 = Math.min(SW - 1, Math.max(sx, ex) + pad);
+        const y0 = Math.max(0, Math.min(sy, ey) - pad), y1 = Math.min(SH - 1, Math.max(sy, ey) + pad);
+        const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+        const N = bw * bh;
+
+        const dist = new Float32Array(N).fill(Infinity);
+        const visited = new Uint8Array(N);
+        const prev = new Int32Array(N).fill(-1);
+        const bidx = (x, y) => (y - y0) * bw + (x - x0);
+
+        const startB = bidx(sx, sy), targetB = bidx(ex, ey);
+        dist[startB] = 0;
+
+        const heap = [];
+        function push(d, n) {
+          heap.push([d, n]);
+          let i = heap.length - 1;
+          while (i > 0) {
+            const p = (i - 1) >> 1;
+            if (heap[p][0] <= heap[i][0]) break;
+            const t = heap[p]; heap[p] = heap[i]; heap[i] = t; i = p;
+          }
+        }
+        function pop() {
+          const top = heap[0];
+          const last = heap.pop();
+          if (heap.length) {
+            heap[0] = last; let i = 0;
+            while (true) {
+              const l = 2 * i + 1, r = 2 * i + 2; let m = i;
+              if (l < heap.length && heap[l][0] < heap[m][0]) m = l;
+              if (r < heap.length && heap[r][0] < heap[m][0]) m = r;
+              if (m === i) break;
+              const t = heap[m]; heap[m] = heap[i]; heap[i] = t; i = m;
+            }
+          }
+          return top;
+        }
+        push(0, startB);
+
+        const NB = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+        let found = false;
+
+        while (heap.length) {
+          const [d, n] = pop();
+          if (visited[n]) continue;
+          visited[n] = 1;
+          if (n === targetB) { found = true; break; }
+          const nx = (n % bw) + x0, ny = ((n / bw) | 0) + y0;
+          for (const [dx, dy] of NB) {
+            const mx = nx + dx, my = ny + dy;
+            if (mx < x0 || mx > x1 || my < y0 || my > y1) continue;
+            if (blocked(mx, my)) continue;
+            const m = bidx(mx, my);
+            if (visited[m]) continue;
+            const trailVal = trailA[idx(mx, my)];
+            const stepCost = (dx !== 0 && dy !== 0 ? Math.SQRT2 : 1) / (trailVal * 0.08 + 0.6);
+            const nd = d + stepCost;
+            if (nd < dist[m]) { dist[m] = nd; prev[m] = n; push(nd, m); }
+          }
+        }
+
+        if (found) {
+          let cur = targetB;
+          const path = [];
+          while (cur !== -1) {
+            path.push([(cur % bw) + x0, ((cur / bw) | 0) + y0]);
+            cur = prev[cur];
+          }
+          path.reverse();
+          routePath = path;
+        }
+      }
+
+      // ---------- params (read live each frame, cheap) ----------
+      function stageBoundaries() {
+        // One-way demonstration: explore -> found in mucus -> retract -> reveal
+        // the actual routes -> run trains -> STOP. No automatic looping.
+        const explore = parseInt(document.getElementById('exploreTicks').value, 10);
+        const found = Math.max(300, parseInt(document.getElementById('transitionTicks').value, 10));
+        const retract = Math.max(500, parseInt(document.getElementById('retractTicks').value, 10));
+        const routeShow = 1500;
+        const trainShow = 1800;
+        const T1 = explore;
+        const T2 = T1 + found;
+        const T3 = T2 + retract;
+        const T4 = T3 + routeShow;
+        const T5 = T4 + trainShow;
+        return { T1, T2, T3, T4, T5, found, retract, routeShow, trainShow };
+      }
+
+      function params() {
+        const sliderDecay = parseFloat(document.getElementById('decay').value);
+        const sliderFW = parseFloat(document.getElementById('foodWeight').value);
+        const sliderJitter = parseFloat(document.getElementById('jitter').value);
+        const { T1, T2, T3, T4, T5, found, retract } = stageBoundaries();
+
+        const foundPh = Math.max(0, Math.min(1, (tick - T1) / found));
+        const retractPh = Math.max(0, Math.min(1, (tick - T2) / retract));
+
+        let foodWeight, trailWeight, jitter, decay, depositFactor;
+        let stageLabel, stageFrac;
+
+        if (tick < T1) {
+          // 1. SEARCH: true flood exploration.
+          // Agents do NOT follow their own mucus yet and do NOT pull toward
+          // nearby stations. They simply wander outward from the station seeds,
+          // laying a diffuse mucus field over the whole dish.
+          foodWeight = 0;
+          trailWeight = 0;
+          jitter = 1.05;
+          decay = 0.985;
+          depositFactor = 1.0;
+          stageLabel = 'searching for routes';
+          stageFrac = tick / Math.max(1, T1);
+
+        } else if (tick < T2) {
+          // 2. ROUTE FORMATION: the colony now behaves like flowing blood in a
+          // branching vessel system. Every station acts as a destination scent,
+          // while the existing mucus gives nearby agents a weak tendency to stay
+          // with promising tubes. The colony is deliberately NOT pruning yet:
+          // false branches and dead-end routes are expected at this stage.
+          // The important visual is active exploration between stations.
+          foodWeight = sliderFW * (0.55 + 0.35 * foundPh);
+          trailWeight = 0.22 + 0.16 * foundPh;
+          jitter = Math.max(0.16, sliderJitter * (1.35 - 0.20 * foundPh));
+          // Keep mucus alive for the entire formation phase instead of letting
+          // early branches fade before the colony has finished searching.
+          decay = 0.9972 + 0.0010 * foundPh;
+          depositFactor = 1.8;
+          stageLabel = 'forming routes';
+          stageFrac = foundPh;
+
+        } else if (tick < T3) {
+          // 3. RETRACT: stop making new slime and let the mucus disappear.
+          foodWeight = 0;
+          trailWeight = 0.15 * (1 - retractPh);
+          jitter = 0.02;
+          decay = 0.9985 - 0.055 * retractPh;
+          depositFactor = 0.0015 * (1 - retractPh);
+          stageLabel = 'retracting';
+          stageFrac = retractPh;
+
+        } else if (tick < T4) {
+          // 4. ACTUAL ROUTES: mucus is completely gone; now reveal the real
+          // network graph cleanly.
+          foodWeight = 0;
+          trailWeight = 0;
+          jitter = 0;
+          decay = 0.5;
+          depositFactor = 0;
+          stageLabel = 'actual routes';
+          stageFrac = (tick - T3) / Math.max(1, T4 - T3);
+
+        } else if (tick < T5) {
+          // 5. WORKING NETWORK: trains move on the revealed routes.
+          foodWeight = 0;
+          trailWeight = 0;
+          jitter = 0;
+          decay = 0.5;
+          depositFactor = 0;
+          stageLabel = 'trains running';
+          stageFrac = (tick - T4) / Math.max(1, T5 - T4);
+
+        } else {
+          // 6. STOP. Keep the final network and trains frozen on screen.
+          foodWeight = 0;
+          trailWeight = 0;
+          jitter = 0;
+          decay = 0.5;
+          depositFactor = 0;
+          stageLabel = 'complete';
+          stageFrac = 1;
+        }
+
+        return {
+          sensorAngle: (tick < T1 ? 45 : parseFloat(document.getElementById('sensorAngle').value)) * Math.PI / 180,
+          sensorDist: tick < T1 ? 20 : (tick < T2 ? 9 : parseFloat(document.getElementById('sensorDist').value)),
+          foodWeight,
+          trailWeight,
+          turnSpeed: tick < T1 ? 0.4 : (tick < T2 ? 0.32 : parseFloat(document.getElementById('turnSpeed').value)),
+          jitter,
+          decay,
+          deposit: parseFloat(document.getElementById('deposit').value) * depositFactor,
+          steps: tick < T1 ? 1 : parseInt(document.getElementById('speed').value, 10),
+          stageLabel, stageFrac,
+          cycleFrac: Math.min(1, tick / T5),
+          T1, T2, T3, T4, T5
+        };
+      }
+
+      function sense(x, y, fw, tw) {
+        let ix = x | 0, iy = y | 0;
+        if (ix < 0 || ix >= SW || iy < 0 || iy >= SH) return -1000;
+        if (blocked(x, y)) return -1000;
+        return trailA[idx(ix, iy)] * tw + fw * food[idx(ix, iy)];
+      }
+
+      function stepAgents(p) {
+        const n = ax.length;
+        const cosOff = Math.cos(p.sensorAngle), sinOff = Math.sin(p.sensorAngle);
+
+        for (let i = 0; i < n; i++) {
+          const x = ax[i], y = ay[i], ang = aang[i];
+          const cB = Math.cos(ang), sB = Math.sin(ang);
+          const cL = cB * cosOff + sB * sinOff, sL = sB * cosOff - cB * sinOff;
+          const cR = cB * cosOff - sB * sinOff, sR = sB * cosOff + cB * sinOff;
+
+          const sC = sense(x + cB * p.sensorDist, y + sB * p.sensorDist, p.foodWeight, p.trailWeight);
+          const sL_ = sense(x + cL * p.sensorDist, y + sL * p.sensorDist, p.foodWeight, p.trailWeight);
+          const sR_ = sense(x + cR * p.sensorDist, y + sR * p.sensorDist, p.foodWeight, p.trailWeight);
+
+          let newAng = ang;
+
+          if (tick < p.T1) {
+            // FLOOD EXPLORATION: deliberately ignore mucus and station attraction.
+            // This is the important visual difference: the colony must spread
+            // broadly across the dish instead of immediately collapsing into
+            // station-to-station corridors. Each agent keeps its heading but
+            // makes a small random turn every step.
+            newAng += (Math.random() * 2 - 1) * p.jitter;
+            // keep exploration directionless: no station seeking, no trail following
+          } else {
+            // ROUTE FORMATION: each agent searches for its own station target.
+            // This deliberately creates many competing branches, like blood
+            // exploring a branching vessel bed, instead of only 2-3 major tubes.
+            const target = stations[atarget[i] % stations.length];
+            const toTarget = Math.atan2(target.y - y, target.x - x);
+            let targetTurn = Math.atan2(Math.sin(toTarget - newAng), Math.cos(toTarget - newAng));
+
+            // Mucus sensing keeps the motion organic, while target steering gives
+            // the colony many different station-to-station directions to explore.
+            if (sC > sL_ && sC > sR_) newAng += (Math.random() - 0.5) * p.jitter * 0.55;
+            else if (sL_ > sR_) newAng -= p.turnSpeed * 0.55;
+            else if (sR_ > sL_) newAng += p.turnSpeed * 0.55;
+
+            newAng += targetTurn * 0.22;
+            newAng += (Math.random() * 2 - 1) * p.jitter * 0.22;
+
+            // Once an agent reaches its target, immediately give it another
+            // destination. This keeps the formation phase searching continuously.
+            if (Math.hypot(target.x - x, target.y - y) < 16) {
+              let next = Math.floor(Math.random() * stations.length);
+              if (stations.length > 1 && next === atarget[i]) {
+                next = (next + 1 + Math.floor(Math.random() * (stations.length - 1))) % stations.length;
+              }
+              atarget[i] = next;
+            }
+          }
+
+          const moveSpeed = tick < p.T1 ? aspeed[i] : 1;
+          const mc = Math.cos(newAng), ms = Math.sin(newAng);
+          let nx = x + mc * moveSpeed, ny = y + ms * moveSpeed;
+
+          // Same wrap-around behaviour as the attached HTML.
+          if (nx < 0) nx = SW;
+          if (nx > SW) nx = 0;
+          if (ny < 0) ny = SH;
+          if (ny > SH) ny = 0;
+
+          if (blocked(nx, ny)) {
+            newAng += Math.PI;
+            nx = x; ny = y;
+          }
+
+          ax[i] = nx; ay[i] = ny; aang[i] = newAng;
+
+          const gx = nx | 0, gy = ny | 0;
+          if (gx >= 0 && gx < SW && gy >= 0 && gy < SH) {
+            if (tick < p.T1) {
+              // Diffuse exploration mucus; it should cover the dish rather than
+              // immediately becoming a reinforced route.
+              const ti = idx(gx, gy);
+              trailA[ti] = Math.min(trailA[ti] + 22, 255);
+            } else {
+              trailA[idx(gx, gy)] += p.deposit;
+            }
+          }
+        }
+      }
+
+      function evaporateOnly(decay) {
+        for (let i = 0; i < trailA.length; i++) trailA[i] *= decay;
+      }
+
+      function diffuseDecay(decay) {
+        for (let y = 0; y < SH; y++) {
+          const yUp = (y > 0 ? y - 1 : y) * SW;
+          const yDn = (y < SH - 1 ? y + 1 : y) * SW;
+          const yC = y * SW;
+          for (let x = 0; x < SW; x++) {
+            const xL = x > 0 ? x - 1 : x;
+            const xR = x < SW - 1 ? x + 1 : x;
+            const sum = trailA[yC + x] + trailA[yC + xL] + trailA[yC + xR] + trailA[yUp + x] + trailA[yDn + x];
+            trailB[yC + x] = (sum / 5) * decay;
+          }
+        }
+        const tmp = trailA; trailA = trailB; trailB = tmp;
+      }
+
+      function initTrains() {
+        rebuildNetworkEdges();
+        trainCars = [];
+        if (!networkEdges.length) return;
+        const count = Math.min(36, Math.max(18, Math.floor(networkEdges.length / 2)));
+        for (let i = 0; i < count; i++) {
+          trainCars.push({
+            edge: i % networkEdges.length,
+            t: ((i * 0.61803398875) % 1) * 0.85,
+            dir: i % 2 === 0 ? 1 : -1,
+            speed: 0.0018 + (i % 3) * 0.00045
+          });
+        }
+      }
+
+      function updateTrains() {
+        for (const tr of trainCars) {
+          tr.t += tr.speed * 3;
+          if (tr.t >= 1) { tr.t = 0; tr.edge = (tr.edge + 1) % networkEdges.length; tr.dir *= -1; }
+        }
+      }
+
+      function drawActualRoutes() {
+        rebuildNetworkEdges();
+        // Reveal the network progressively, edge by edge, so it looks like the
+        // subway system is being discovered/constructed in front of you.
+        const { T3, T4 } = stageBoundaries();
+        const phase = Math.max(0, Math.min(1, (tick - T3) / Math.max(1, T4 - T3)));
+        const count = Math.max(1, Math.ceil(networkEdges.length * phase));
+
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        for (let i = 0; i < count; i++) {
+          const e = networkEdges[i];
+          const a = stations[e.a], b = stations[e.b];
+          // Each newly revealed line grows outward from its first station.
+          const local = i < count - 1 ? 1 : Math.min(1, phase * networkEdges.length - i + 1);
+          const x = b.x * local + a.x * (1 - local);
+          const y = b.y * local + a.y * (1 - local);
+          ctx.beginPath();
+          ctx.moveTo(a.x * SCALE, a.y * SCALE);
+          ctx.lineTo(x * SCALE, y * SCALE);
+          ctx.strokeStyle = 'rgba(242,183,5,0.82)';
+          ctx.lineWidth = 2.6;
+          ctx.shadowColor = 'rgba(242,183,5,0.38)';
+          ctx.shadowBlur = 5;
+          ctx.stroke();
+        }
+        ctx.shadowBlur = 0;
+        ctx.restore();
+      }
+
+      function initPlanTrains() {
+        if (routePath.length < 2) return false;
+        planTrainCars = [];
+        for (let i = 0; i < 6; i++) planTrainCars.push({ pos: i / 6, speed: 0.0009 + (i % 3) * 0.00012 });
+        return true;
+      }
+      function updatePlanTrains() {
+        const n = routePath.length - 1;
+        if (n < 1) return;
+        for (const tr of planTrainCars) { tr.pos += tr.speed; if (tr.pos >= 1) tr.pos -= 1; }
+      }
+      function drawPlanTrains() {
+        if (!routeMode || routePath.length < 2 || !planTrainCars.length) return;
+        const n = routePath.length - 1; ctx.save();
+        for (const tr of planTrainCars) {
+          const q = tr.pos * n, i = Math.min(n - 1, Math.floor(q)), f = q - i;
+          const a = routePath[i], b = routePath[i + 1];
+          const x = (a[0] + (b[0] - a[0]) * f) * SCALE, y = (a[1] + (b[1] - a[1]) * f) * SCALE;
+          ctx.beginPath(); ctx.fillStyle = '#ffffff'; ctx.shadowColor = '#9fe8ff'; ctx.shadowBlur = 9; ctx.arc(x, y, 4.2, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.shadowBlur = 0; ctx.restore();
+      }
+      function planTrainLoop() {
+        if (!planTrainRunning) return;
+        updatePlanTrains(); render(); planTrainRAF = requestAnimationFrame(planTrainLoop);
+      }
+
+      function drawTrains() {
+        if (!trainCars.length) return;
+        ctx.save();
+        for (const tr of trainCars) {
+          const e = networkEdges[tr.edge];
+          if (!e) continue;
+          const a = stations[e.a], b = stations[e.b];
+          const tt = tr.dir === 1 ? tr.t : 1 - tr.t;
+          const x = (a.x + (b.x - a.x) * tt) * SCALE;
+          const y = (a.y + (b.y - a.y) * tt) * SCALE;
+
+          ctx.beginPath();
+          ctx.fillStyle = '#fff3bd';
+          ctx.shadowColor = '#f2b705';
+          ctx.shadowBlur = 10;
+          ctx.arc(x, y, 4.2, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Small tail gives the impression of a moving train rather than a dot.
+          const dx = (b.x - a.x) * SCALE, dy = (b.y - a.y) * SCALE;
+          const len = Math.hypot(dx, dy) || 1;
+          const ux = dx / len, uy = dy / len;
+          ctx.beginPath();
+          ctx.strokeStyle = 'rgba(247,211,116,0.9)';
+          ctx.lineWidth = 2.2;
+          ctx.moveTo(x - ux * 8, y - uy * 8);
+          ctx.lineTo(x - ux * 2, y - uy * 2);
+          ctx.stroke();
+        }
+        ctx.shadowBlur = 0;
+        ctx.restore();
+      }
+
+      // ---------- rendering ----------
+      function render() {
+        const data = imgData.data;
+        let maxV = 1;
+        for (let k = 0; k < trailA.length; k++) { if (trailA[k] > maxV) maxV = trailA[k]; }
+        const norm = 1 / Math.max(maxV * 0.6, 8);
+        const explorationPhase = tick < parseInt(document.getElementById('exploreTicks').value, 10);
+
+        for (let y = 0; y < SH; y++) {
+          for (let x = 0; x < SW; x++) {
+            const i = idx(x, y);
+            const p4 = i * 4;
+            if (inBay(x, y)) {
+              data[p4] = 0; data[p4 + 1] = 0; data[p4 + 2] = 0; data[p4 + 3] = 0;
+              continue;
+            }
+            if (isPaintedObstacle(x, y)) {
+              data[p4] = 58; data[p4 + 1] = 36; data[p4 + 2] = 24; data[p4 + 3] = 190;
+              continue;
+            }
+            let v = explorationPhase ? Math.min(1, trailA[i] / 255) : trailA[i] * norm;
+            if (!explorationPhase) v = 1 - Math.exp(-v * 1.4);
+            if (v > 1) v = 1;
+            data[p4] = 242; data[p4 + 1] = 183; data[p4 + 2] = 20;
+            data[p4 + 3] = Math.round(v * 232);
+          }
+        }
+        offCtx.putImageData(imgData, 0, 0);
+
+        ctx.clearRect(0, 0, W, H);
+
+        // bloom pass
+        ctx.save();
+        ctx.filter = 'blur(6px)';
+        ctx.globalAlpha = 0.5;
+        ctx.drawImage(off, 0, 0, SW, SH, 0, 0, W, H);
+        ctx.restore();
+
+        // crisp pass
+        ctx.imageSmoothingEnabled = true;
+        ctx.globalAlpha = 1;
+        ctx.drawImage(off, 0, 0, SW, SH, 0, 0, W, H);
+
+        // During route formation, show the living colony itself as small moving
+        // points inside the mucus, like flow through branching blood vessels.
+        if (tick >= parseInt(document.getElementById('exploreTicks').value, 10) &&
+          tick < params().T2) {
+          ctx.save();
+          ctx.fillStyle = 'rgba(255,220,120,0.72)';
+          ctx.shadowColor = 'rgba(242,183,5,0.65)';
+          ctx.shadowBlur = 4;
+          const stride = Math.max(1, Math.floor(ax.length / 900));
+          for (let ai = 0; ai < ax.length; ai += stride) {
+            ctx.beginPath();
+            ctx.arc(ax[ai] * SCALE, ay[ai] * SCALE, 0.8, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+
+        // STEP 4 PREVIEW: show the actual network only in Explore mode.
+        // When Plan Route is selected, return to the normal route-planning view
+        // instead of leaving the finished simulation network on screen.
+        if (!routeMode) {
+          const stageNow = params();
+          if (tick >= stageNow.T3 && tick < stageNow.T4) {
+            const routePhase = (tick - stageNow.T3) / Math.max(1, stageNow.T4 - stageNow.T3);
+            drawWholeNetwork(routePhase, false);
+            drawActualRoutes();
+          } else if (tick >= stageNow.T4) {
+            drawActualRoutes();
+          }
+        }
+
+        // stations
+        let linked = 0;
+        for (let si = 0; si < stations.length; si++) {
+          const s = stations[si];
+          const sxp = s.x * SCALE, syp = s.y * SCALE;
+
+          if (!routeMode) {
+            const ix = s.x | 0, iy = s.y | 0;
+            const localVal = trailA[idx(Math.min(SW - 1, Math.max(0, ix)), Math.min(SH - 1, Math.max(0, iy)))];
+            const isLinked = localVal > 40;
+            if (isLinked) linked++;
+
+            ctx.beginPath();
+            if (isLinked) {
+              const pulse = 3 + Math.sin(tick * 0.08 + s.x) * 1.2;
+              ctx.fillStyle = '#f7d374';
+              ctx.shadowColor = '#f2b705';
+              ctx.shadowBlur = 10;
+              ctx.arc(sxp, syp, 4 + pulse * 0.3, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.shadowBlur = 0;
+            } else {
+              ctx.strokeStyle = '#6fae9b';
+              ctx.lineWidth = 1.4;
+              ctx.arc(sxp, syp, 4, 0, Math.PI * 2);
+              ctx.stroke();
+            }
+            ctx.font = "bold 10px 'IBM Plex Mono', monospace";
+            haloText(s.name, sxp + 7, syp + 3, isLinked ? '#fff3bd' : 'rgba(234,228,211,0.92)');
+
+          } else {
+            const isStart = si === startIdx, isEnd = si === endIdx;
+            ctx.beginPath();
+            if (isStart || isEnd) {
+              const pulse = 3 + Math.sin(tick * 0.08 + s.x) * 1.2;
+              ctx.fillStyle = isStart ? '#8fd6bd' : '#f7d374';
+              ctx.shadowColor = isStart ? '#6fae9b' : '#f2b705';
+              ctx.shadowBlur = 12;
+              ctx.arc(sxp, syp, 5 + pulse * 0.3, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.shadowBlur = 0;
+              ctx.font = "bold 10px 'IBM Plex Mono', monospace";
+              haloText((isStart ? 'START · ' : 'END · ') + s.name, sxp + 8, syp + 3, '#ffffff', 'rgba(6,8,5,0.95)');
+            } else {
+              ctx.strokeStyle = 'rgba(180,178,160,0.75)';
+              ctx.lineWidth = 1;
+              ctx.arc(sxp, syp, 3, 0, Math.PI * 2);
+              ctx.stroke();
+              ctx.font = "9px 'IBM Plex Mono', monospace";
+              haloText(s.name, sxp + 6, syp + 3, 'rgba(234,228,211,0.8)');
+            }
+          }
+        }
+
+        if (!routeMode) {
+          document.getElementById('rLinked').textContent = linked + ' / ' + stations.length;
+        } else {
+          document.getElementById('rRouteStatus').textContent =
+            endIdx === null ? (startIdx === null ? 'pick a start station' : 'pick an end station')
+              : (candidateRoutes.length ? candidateRoutes.length + ' routes · optimal highlighted' : 'searching…');
+
+          // Show every plausible station route, then highlight the optimal one.
+          if (candidateRoutes.length) {
+            ctx.save(); ctx.lineCap = 'round';
+            const maxShown = Math.min(candidateRoutes.length, 120);
+            for (let r = 0; r < maxShown; r++) {
+              const route = candidateRoutes[r]; if (route.nodes.length < 2) continue;
+              ctx.beginPath(); ctx.moveTo(route.points[0][0] * SCALE, route.points[0][1] * SCALE);
+              for (let k = 1; k < route.points.length; k++) ctx.lineTo(route.points[k][0] * SCALE, route.points[k][1] * SCALE);
+              const reveal = Math.min(1, (performance.now() - routeRevealStart) / 1400);
+              const alpha = r === 0 ? 0.55 * reveal : Math.max(0.05, 0.32 * reveal * (1 - r / maxShown));
+              ctx.strokeStyle = r === 0 ? 'rgba(255,214,74,' + alpha + ')' : 'rgba(140,214,189,' + alpha + ')';
+              ctx.lineWidth = r === 0 ? 5.5 : 1.8; ctx.stroke();
+            }
+            if (routePath.length > 1 && (performance.now() - routeRevealStart) >= 1400) {
+              ctx.beginPath(); ctx.moveTo(routePath[0][0] * SCALE, routePath[0][1] * SCALE);
+              for (let k = 1; k < routePath.length; k++) ctx.lineTo(routePath[k][0] * SCALE, routePath[k][1] * SCALE);
+              ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 3.2; ctx.shadowColor = 'rgba(255,255,255,0.55)'; ctx.shadowBlur = 7; ctx.stroke(); ctx.shadowBlur = 0;
+              const total = routePath.length, cyclePos = (tick * 0.6) % (total * 2), frac = cyclePos < total ? cyclePos : (total * 2 - cyclePos);
+              const seg = routePath[Math.max(0, Math.min(total - 1, Math.floor(frac)))];
+              ctx.beginPath(); ctx.fillStyle = '#ffffff'; ctx.shadowColor = '#9fe8ff'; ctx.shadowBlur = 8; ctx.arc(seg[0] * SCALE, seg[1] * SCALE, 4, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+            }
+            ctx.restore();
+            if (!running && (performance.now() - routeRevealStart) < 1400) requestAnimationFrame(() => render());
+          }
+        }
+
+        // STEP 5 preview: trains run on the revealed network after the route stage.
+        const stageNow = params();
+        if (!routeMode && tick >= stageNow.T4) { drawTrains(); }
+        if (routeMode && planTrainRunning) { drawPlanTrains(); }
+
+        // hover tooltip
+        if (hoveredIdx >= 0 && hoveredIdx < stations.length) {
+          const s = stations[hoveredIdx];
+          const ix2 = Math.min(SW - 1, Math.max(0, s.x | 0)), iy2 = Math.min(SH - 1, Math.max(0, s.y | 0));
+          const localVal = trailA[idx(ix2, iy2)];
+          const pct = Math.round(Math.min(100, localVal / Math.max(1, maxV) * 100));
+          const label1 = s.name + (s.custom ? ' (custom · click to remove)' : '');
+          const label2 = routeMode
+            ? (hoveredIdx === startIdx ? 'start' : hoveredIdx === endIdx ? 'end' : 'click to set start/end · drag to move')
+            : ((localVal > 40 ? 'linked · ' : '') + 'signal ' + pct + '% · drag to move');
+
+          ctx.font = "10px 'IBM Plex Mono', monospace";
+          const tx = s.x * SCALE, ty = s.y * SCALE;
+          const w1 = ctx.measureText(label1).width, w2 = ctx.measureText(label2).width;
+          const boxW = Math.max(w1, w2) + 16, boxH = 34;
+          let bx = tx + 12, by = ty - boxH - 10;
+          if (bx + boxW > W) bx = tx - boxW - 12;
+          if (by < 0) by = ty + 14;
+
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(bx, by, boxW, boxH, 4); else ctx.rect(bx, by, boxW, boxH);
+          ctx.fillStyle = 'rgba(8,10,6,0.92)';
+          ctx.strokeStyle = 'rgba(242,183,5,0.5)';
+          ctx.lineWidth = 1;
+          ctx.fill(); ctx.stroke();
+
+          ctx.fillStyle = '#f7d374';
+          ctx.fillText(label1, bx + 8, by + 14);
+          ctx.fillStyle = '#8d8a76';
+          ctx.fillText(label2, bx + 8, by + 27);
+        }
+      }
+
+      // ---------- loop ----------
+      let lastFpsT = performance.now(), frames = 0;
+      function loop() {
+        const p = params();
+
+        if (!simulationFinished) {
+          for (let s = 0; s < p.steps; s++) {
+            if (tick < p.T3) {
+              stepAgents(p);
+              if (tick < p.T1) evaporateOnly(p.decay);
+              else diffuseDecay(p.decay);
+            }
+            tick++;
+            if (tick === p.T3) {
+              // Guarantee the mucus is completely gone before the clean route map appears.
+              trailA.fill(0);
+              trailB.fill(0);
+            }
+            if (tick >= p.T4 && tick < p.T5) {
+              if (!trainCars.length) initTrains();
+              updateTrains();
+            }
+            if (tick >= p.T5) {
+              simulationFinished = true;
+              running = false;
+              document.getElementById('playBtn').textContent = 'Finished';
+              document.getElementById('rState').textContent = 'complete';
+              break;
+            }
+          }
+        }
+
+        render();
+        document.getElementById('rTick').textContent = tick;
+
+        const live = params();
+        document.getElementById('rPhase').textContent = live.stageFrac < 1
+          ? live.stageLabel + ' · ' + Math.round(live.stageFrac * 100) + '%'
+          : live.stageLabel;
+        document.getElementById('phaseFill').style.width = (live.cycleFrac * 100) + '%';
+
+        frames++;
+        const now = performance.now();
+        if (now - lastFpsT > 500) {
+          const fps = Math.round(frames * 1000 / (now - lastFpsT));
+          document.getElementById('fps').textContent = fps + ' fps';
+          frames = 0; lastFpsT = now;
+        }
+
+        if (running) rafId = requestAnimationFrame(loop);
+      }
+
+      // ---------- UI wiring ----------
+      const rangeIds = {
+        agents: 'vAgents', speed: 'vSpeed', sensorAngle: 'vSA', sensorDist: 'vSD',
+        foodWeight: 'vFW', turnSpeed: 'vTS', jitter: 'vJ', decay: 'vDecay', deposit: 'vDep',
+        exploreTicks: 'vExploreT', transitionTicks: 'vTransT', holdTicks: 'vHoldT', retractTicks: 'vRetractT'
+      };
+      for (const id in rangeIds) {
+        const el = document.getElementById(id);
+        const out = document.getElementById(rangeIds[id]);
+        const fmt = (v) => {
+          if (id === 'sensorAngle') return v + '°';
+          if (id === 'decay') return parseFloat(v).toFixed(3);
+          if (id === 'turnSpeed') return parseFloat(v).toFixed(2);
+          if (id === 'foodWeight' || id === 'deposit') return parseFloat(v).toFixed(1);
+          return v;
+        };
+        out.textContent = fmt(el.value);
+        el.addEventListener('input', () => { out.textContent = fmt(el.value); });
+      }
+      document.getElementById('agents').addEventListener('change', () => {
+        if (!running) initAgents();
+      });
+
+      document.getElementById('playBtn').addEventListener('click', () => {
+        if (routeMode) {
+          if (startIdx == null || endIdx == null || startIdx === endIdx) return;
+          if (routePath.length < 2) traceRoute();
+          if (routePath.length < 2) return;
+          planTrainRunning = !planTrainRunning;
+          document.getElementById('playBtn').textContent = planTrainRunning ? 'Pause' : 'Start';
+          document.getElementById('rState').textContent = planTrainRunning ? 'trains running' : 'paused';
+          if (planTrainRunning) { if (!planTrainCars.length) initPlanTrains(); planTrainLoop(); }
+          else if (planTrainRAF) { cancelAnimationFrame(planTrainRAF); planTrainRAF = null; }
+          return;
+        }
+        if (simulationFinished) return;
+        running = !running;
+        document.getElementById('playBtn').textContent = running ? 'Pause' : 'Start';
+        document.getElementById('rState').textContent = running ? 'growing' : 'paused';
+        if (running) { lastFpsT = performance.now(); frames = 0; loop(); }
+        else if (rafId) cancelAnimationFrame(rafId);
+      });
+
+      document.getElementById('resetBtn').addEventListener('click', () => {
+        running = false;
+        if (rafId) cancelAnimationFrame(rafId);
+        document.getElementById('playBtn').textContent = 'Start';
+        document.getElementById('rState').textContent = 'paused';
+        resetAll();
+        document.getElementById('rAgents').textContent = ax.length;
+      });
+
+      function setMode(mode) {
+        routeMode = (mode === 'route');
+        // Leaving the finished simulation for route planning must also remove trains.
+        if (routeMode) { trainCars = []; planTrainCars = []; planTrainRunning = false; if (planTrainRAF) cancelAnimationFrame(planTrainRAF); planTrainRAF = null; }
+        document.getElementById('exploreModeBtn').classList.toggle('primary', !routeMode);
+        document.getElementById('routeModeBtn').classList.toggle('primary', routeMode);
+        document.getElementById('rMode').textContent = routeMode ? 'plan route' : 'explore';
+        document.getElementById('linkedRow').style.display = routeMode ? 'none' : 'flex';
+        document.getElementById('routeRow').style.display = routeMode ? 'flex' : 'none';
+        document.getElementById('routeStatusRow').style.display = routeMode ? 'flex' : 'none';
+        document.getElementById('caption').textContent = obstacleToolActive
+          ? 'Drag on the dish to paint a barrier the colony must route around'
+          : (routeMode ? 'Click a station to set Start, then another for End'
+            : 'Click the dish to add a stop, or drag a station to move it');
+
+        startIdx = null; endIdx = null; routePath = []; candidateRoutes = []; routeRevealStart = 0; lastRouteCalc = -9999;
+        updateRouteLabel();
+        rebuildFoodForMode();
+        trailA.fill(0); trailB.fill(0);
+        initAgents();
+        if (!running) render();
+      }
+
+      document.getElementById('exploreModeBtn').addEventListener('click', () => setMode('explore'));
+      document.getElementById('routeModeBtn').addEventListener('click', () => setMode('route'));
+
+      document.getElementById('clearRouteBtn').addEventListener('click', () => {
+        startIdx = null; endIdx = null; routePath = []; candidateRoutes = []; routeRevealStart = 0; lastRouteCalc = -9999;
+        updateRouteLabel();
+        rebuildFoodForMode();
+        trailA.fill(0); trailB.fill(0);
+        initAgents();
+        if (!running) render();
+      });
+
+      function simCoordsFromEvent(evt) {
+        const rect = canvas.getBoundingClientRect();
+        const t = (evt.touches && evt.touches[0]) || (evt.changedTouches && evt.changedTouches[0]) || evt;
+        const mx = (t.clientX - rect.left) * (W / rect.width) / SCALE;
+        const my = (t.clientY - rect.top) * (H / rect.height) / SCALE;
+        return [mx, my];
+      }
+
+      function nearestStation(mx, my, thresh) {
+        let best = -1, bestD2 = thresh * thresh;
+        for (let i = 0; i < stations.length; i++) {
+          const s = stations[i];
+          const dx = s.x - mx, dy = s.y - my, d2 = dx * dx + dy * dy;
+          if (d2 < bestD2) { bestD2 = d2; best = i; }
+        }
+        return best;
+      }
+
+      function handleStationClick(i) {
+        if (routeMode) {
+          if (startIdx === null) { startIdx = i; }
+          else if (i === startIdx) { startIdx = null; }
+          else { endIdx = i; }
+          updateRouteLabel();
+          rebuildFoodForMode();
+          trailA.fill(0); trailB.fill(0);
+          initAgents();
+          routePath = []; candidateRoutes = []; routeRevealStart = 0; lastRouteCalc = -9999;
+          if (startIdx != null && endIdx != null) traceRoute();
+          if (!running) render();
+        } else if (stations[i].custom) {
+          stations.splice(i, 1);
+          if (startIdx != null) { if (startIdx === i) startIdx = null; else if (startIdx > i) startIdx--; }
+          if (endIdx != null) { if (endIdx === i) endIdx = null; else if (endIdx > i) endIdx--; }
+          hoveredIdx = -1;
+          updateRouteLabel();
+          rebuildFoodForMode();
+          if (!running) render();
+        }
+      }
+
+      function handleEmptyClick(mx, my) {
+        if (blocked(mx, my) || routeMode) return;
+        const name = 'Stop ' + (stations.length - BASE_STATIONS.length + 1);
+        stations.push({ name, x: mx, y: my, custom: true });
+        stampFood(mx, my, 28, 16);
+        document.getElementById('rLinked').textContent = '0 / ' + stations.length;
+        if (!running) render();
+      }
+
+      function onPointerDown(evt) {
+        evt.preventDefault();
+        const [mx, my] = simCoordsFromEvent(evt);
+        downSim = [mx, my];
+        dragMoved = false;
+
+        if (obstacleToolActive) {
+          paintDown = true;
+          paintObstacleAt(mx, my, 8);
+          if (!running) render();
+          return;
+        }
+        dragStationIdx = nearestStation(mx, my, 14);
+      }
+
+      function onPointerMove(evt) {
+        const [mx, my] = simCoordsFromEvent(evt);
+
+        if (obstacleToolActive) {
+          if (paintDown) { paintObstacleAt(mx, my, 8); if (!running) render(); }
+          return;
+        }
+
+        if (dragStationIdx >= 0) {
+          dragMoved = true;
+          const s = stations[dragStationIdx];
+          s.x = Math.max(2, Math.min(SW - 3, mx));
+          s.y = Math.max(2, Math.min(SH - 3, my));
+          rebuildFoodForMode();
+          if (routeMode && (dragStationIdx === startIdx || dragStationIdx === endIdx)) updateRouteLabel();
+          if (!running) render();
+          return;
+        }
+
+        const hit = nearestStation(mx, my, 12);
+        if (hit !== hoveredIdx) {
+          hoveredIdx = hit;
+          canvas.style.cursor = hit >= 0 ? 'grab' : 'crosshair';
+          if (!running) render();
+        }
+      }
+
+      function onPointerUp(evt) {
+        if (obstacleToolActive) { paintDown = false; return; }
+
+        if (dragStationIdx >= 0) {
+          const i = dragStationIdx;
+          dragStationIdx = -1;
+          if (!dragMoved) {
+            handleStationClick(i);
+          } else if (routeMode && startIdx != null && endIdx != null) {
+            routePath = []; candidateRoutes = []; routeRevealStart = 0; lastRouteCalc = -9999;
+            traceRoute();
+            if (!running) render();
+          }
+          return;
+        }
+
+        const [mx, my] = simCoordsFromEvent(evt);
+        const ddx = mx - downSim[0], ddy = my - downSim[1];
+        if (ddx * ddx + ddy * ddy > 4) return; // was a drag over empty space — ignore
+        handleEmptyClick(mx, my);
+      }
+
+      canvas.addEventListener('mousedown', onPointerDown);
+      canvas.addEventListener('mousemove', onPointerMove);
+      window.addEventListener('mouseup', onPointerUp);
+      canvas.addEventListener('touchstart', onPointerDown, { passive: false });
+      canvas.addEventListener('touchmove', onPointerMove, { passive: false });
+      window.addEventListener('touchend', onPointerUp);
+
+      document.getElementById('obstacleToolBtn').addEventListener('click', () => {
+        obstacleToolActive = !obstacleToolActive;
+        document.getElementById('obstacleToolBtn').classList.toggle('primary', obstacleToolActive);
+        document.getElementById('caption').textContent = obstacleToolActive
+          ? 'Drag on the dish to paint a barrier the colony must route around'
+          : (routeMode ? 'Click a station to set Start, then another for End'
+            : 'Click the dish to add a stop, or drag a station to move it');
+      });
+      document.getElementById('clearObstaclesBtn').addEventListener('click', () => {
+        clearObstacles();
+        if (!running) render();
+      });
+
+      document.getElementById('skipStageBtn').addEventListener('click', () => {
+        const { T1, T2, T3, T4, T5 } = stageBoundaries();
+        if (tick < T1) tick = T1;
+        else if (tick < T2) tick = T2;
+        else if (tick < T3) tick = T3;
+        else if (tick < T4) tick = T4;
+        else if (tick < T5) { tick = T5; simulationFinished = true; running = false; document.getElementById('playBtn').textContent = 'Finished'; document.getElementById('rState').textContent = 'complete'; }
+        if (tick >= T4 && tick < T5 && !trainCars.length) initTrains();
+        routePath = []; candidateRoutes = []; routeRevealStart = 0; lastRouteCalc = -9999;
+        if (!running) render();
+      });
+
+      document.getElementById('snapshotBtn').addEventListener('click', () => {
+        try {
+          const url = canvas.toDataURL('image/png');
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'tokyo-slime-mold-network.png';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        } catch (err) { console.warn('Snapshot failed:', err); }
+      });
+
+      document.addEventListener('keydown', (e) => {
+        const tag = (e.target && e.target.tagName) || '';
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        if (e.code === 'Space') { e.preventDefault(); document.getElementById('playBtn').click(); }
+        else if (e.key === 'r' || e.key === 'R') { document.getElementById('resetBtn').click(); }
+        else if (e.key === 'o' || e.key === 'O') { document.getElementById('obstacleToolBtn').click(); }
+      });
+
+      // ---------- init ----------
+      rebuildFoodForMode();
+      initAgents();
+      document.getElementById('rAgents').textContent = ax.length;
+      render();
+    })();
+  </script>
+
+
+<!-- ===================================================== -->
+<!-- MEET OUR TEAM -->
+<!-- ===================================================== -->
+<section id="teamTab" class="team-section tab-content tab-page">
+
+    <h2>Meet Our Team</h2>
+
+    <p class="team-subtitle">
+    </p>
+
+    <div class="team-container">
+
+        <!-- MEMBER 1 -->
+        <div class="team-card">
+            <img src="EOB/assets/images/aarshia.jpeg" alt="Team Member 1">
+
+            <h3>Aarshia Sharma</h3>
+
+            <p>
+                <strong>ID:70022600438</strong>
+            </p>
+
+            <p>
+                <strong>Roll No:C440</strong> 
+            </p>
+        </div>
+
+
+        <!-- MEMBER 2 -->
+        <div class="team-card">
+            <img src="EOB/assets/images/nidhi.jpeg" alt="Team Member 2">
+
+            <h3>Nidhi Shetty</h3>
+
+            <p>
+                <strong>ID:70022600037</strong>
+            </p>
+
+            <p>
+                <strong>Roll No:C447</strong>
+            </p>
+        </div>
+
+
+        <!-- MEMBER 3 -->
+        <div class="team-card">
+            <img src="EOB/assets/images/raashi.jpeg" alt="Team Member 3">
+
+            <h3>Rashi Shinde</h3>
+
+            <p>
+                <strong>ID:70022600439</strong>
+            </p>
+
+            <p>
+                <strong>Roll No:C449</strong> 
+            </p>
+        </div>
+
+
+        <!-- MEMBER 4 -->
+        <div class="team-card">
+            <img src="EOB/assets/images/aaditi.jpeg" alt="Team Member 4">
+
+            <h3>Aaditi Singh</h3>
+
+            <p>
+                <strong>ID:70022600285</strong>
+
+            <p>
+                <strong>Roll No:C458</strong> 
+            </p>
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ============================= -->
+<!-- TEAM SECTION CSS -->
+<!-- ============================= -->
+
+<style>
+
+.team-section {
+    padding: 70px 30px;
+    text-align: center;
+    background: #0b0c10;
+    color: #ffffff;
+}
+
+.team-section h2 {
+    font-size: 32px;
+    margin-bottom: 10px;
+    color: #f2b705;
+}
+
+.team-subtitle {
+    color: #9ca3af;
+    margin-bottom: 40px;
+    font-size: 15px;
+}
+
+.team-container {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 25px;
+    max-width: 1100px;
+    margin: auto;
+}
+
+.team-card {
+    background: #151922;
+    border: 1px solid #292e39;
+    border-radius: 16px;
+    padding: 25px 15px;
+    transition: 0.3s ease;
+}
+
+.team-card:hover {
+    transform: translateY(-8px);
+    border-color: #f2b705;
+    box-shadow: 0 10px 30px rgba(242, 183, 5, 0.15);
+}
+
+.team-card img {
+    width: 130px;
+    height: 130px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 3px solid #f2b705;
+    margin-bottom: 15px;
+}
+
+.team-card h3 {
+    margin: 8px 0 15px;
+    font-size: 18px;
+    color: #ffffff;
+}
+
+.team-card p {
+    margin: 7px 0;
+    font-size: 14px;
+    color: #aeb4c0;
+}
+
+.team-card strong {
+    color: #f2b705;
+}
+
+
+/* Responsive layout */
+
+@media (max-width: 900px) {
+    .team-container {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 500px) {
+    .team-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+</style>
+</body>
+
+</html>
